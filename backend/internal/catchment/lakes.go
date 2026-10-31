@@ -1,6 +1,8 @@
-package main
+package catchment
 
 import (
+	"jalrakshak/backend/data"
+
 	"encoding/json"
 	"fmt"
 	"log"
@@ -31,12 +33,12 @@ type Region struct {
 	ByID  map[string]*Lake
 }
 
-// defaultLakeID is used for zones exported before multi-lake support (no lake_id).
-const defaultLakeID = "jaisamand"
+// DefaultLakeID is used for zones exported before multi-lake support (no lake_id).
+const DefaultLakeID = "jaisamand"
 
-// loadRegion splits the combined zone GeoJSON by lake_id and builds one
+// LoadRegion splits the combined zone GeoJSON by lake_id and builds one
 // Catchment per lake. Lakes listed in lakes.json without data are skipped.
-func loadRegion(geojson, lakesJSON []byte) (*Region, error) {
+func LoadRegion(geojson, lakesJSON []byte) (*Region, error) {
 	var metas []LakeMeta
 	if err := json.Unmarshal(lakesJSON, &metas); err != nil {
 		return nil, fmt.Errorf("parse lakes.json: %w", err)
@@ -60,7 +62,7 @@ func loadRegion(geojson, lakesJSON []byte) (*Region, error) {
 		}
 		id := f.Properties.LakeID
 		if id == "" {
-			id = defaultLakeID
+			id = DefaultLakeID
 		}
 		byLake[id] = append(byLake[id], raw)
 	}
@@ -104,12 +106,25 @@ type LakeSummary struct {
 	TopZone string `json:"top_zone"` // zone losing the most tonnes per year
 }
 
-func (l *Lake) summaryRow() LakeSummary {
+func (l *Lake) SummaryRow() LakeSummary {
 	top := l.Zones[0]
 	for _, z := range l.Zones {
 		if z.TTotal > top.TTotal {
 			top = z
 		}
 	}
-	return LakeSummary{LakeMeta: l.LakeMeta, Summary: l.summary(), TopZone: top.ID}
+	return LakeSummary{LakeMeta: l.LakeMeta, Summary: l.Catchment.Summary(), TopZone: top.ID}
+}
+
+// LoadEmbedded builds the region from the zone data compiled into the binary.
+func LoadEmbedded() (*Region, error) {
+	geojson, err := data.FS.ReadFile("zones.geojson")
+	if err != nil {
+		return nil, err
+	}
+	lakes, err := data.FS.ReadFile("lakes.json")
+	if err != nil {
+		return nil, err
+	}
+	return LoadRegion(geojson, lakes)
 }

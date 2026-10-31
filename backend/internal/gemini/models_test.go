@@ -1,4 +1,4 @@
-package main
+package gemini
 
 import (
 	"errors"
@@ -55,12 +55,12 @@ func TestGeminiStatusUnwraps(t *testing.T) {
 
 func TestGeminiModelsEnv(t *testing.T) {
 	t.Setenv("GEMINI_MODELS", " x , y,,z ")
-	if got := geminiModels(); !slices.Equal(got, []string{"x", "y", "z"}) {
+	if got := modelsFromEnv(); !slices.Equal(got, []string{"x", "y", "z"}) {
 		t.Errorf("GEMINI_MODELS: got %v", got)
 	}
 	t.Setenv("GEMINI_MODELS", "")
 	t.Setenv("GEMINI_MODEL", "only")
-	if got := geminiModels(); !slices.Equal(got, []string{"only"}) {
+	if got := modelsFromEnv(); !slices.Equal(got, []string{"only"}) {
 		t.Errorf("GEMINI_MODEL fallback: got %v", got)
 	}
 }

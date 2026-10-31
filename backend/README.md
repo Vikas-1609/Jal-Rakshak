@@ -3,6 +3,19 @@
 Go API for several Aravalli lake catchments: zone data, the intervention simulator, and Gemini explanations and chat.
 Zone data is `data/zones.geojson` (the `04_multi_lake.js` export) and lake descriptions are `data/lakes.json`, both embedded in the binary.
 
+## Layout
+
+| Path | What it holds |
+|---|---|
+| `cmd/api` | `main`: reads config, loads the data, starts the server or runs `-pregen` |
+| `data` | the embedded zone data (`data.FS`) |
+| `internal/catchment` | lakes, zones, the fix simulator and summaries; no I/O beyond the embedded data |
+| `internal/gemini` | explanations (`explain.go`), chat (`chat.go`), the facts Gemini sees (`facts.go`), model fallback (`models.go`) |
+| `internal/api` | HTTP routes and handlers (`server.go`, `chat.go`), CORS and logging (`middleware.go`) |
+| `internal/config` | `.env` loading and environment helpers |
+
+Dependencies point one way: `api` → `gemini` → `catchment` → `data`.
+
 ## Run locally
 
 Put the key in `backend/.env` (never committed, never copied into the Docker image):
@@ -12,7 +25,8 @@ GEMINI_API_KEY=<key from aistudio.google.com>
 ```
 
 ```powershell
-go run .
+go run ./cmd/api
+go test ./...
 ```
 
 Optional: `GEMINI_MODELS` (comma-separated, tried in order when one is out of quota or overloaded; default `gemini-3.1-flash-lite,gemini-3.5-flash,gemini-3-flash-preview`), `PORT` (default 8080), `ALLOWED_ORIGIN` (default `*`).
@@ -52,7 +66,7 @@ Simulate body: `all` applies to every zone, and `zones` overrides it per zone.
 ## Demo safety: save explanations in advance
 
 ```powershell
-go run . -pregen      # writes data/explanations.json
+go run ./cmd/api -pregen      # writes data/explanations.json
 ```
 
 Rebuild after this. If Gemini fails at demo time, the API serves these saved answers. Chat has no fallback.

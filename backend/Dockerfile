@@ -9,7 +9,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 # Static binary: no C libraries needed in the runtime image.
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /jalrakshak .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /jalrakshak ./cmd/api
 
 # Distroless: just the binary, CA certificates (for HTTPS to Gemini) and a
 # non-root user. No shell or package manager to attack.

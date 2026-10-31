@@ -1,4 +1,4 @@
-package main
+package catchment
 
 import (
 	"math"
@@ -8,11 +8,11 @@ import (
 // testCatchment returns Jaisamand, the lake the tests' expectations are based on.
 func testCatchment(t *testing.T) *Catchment {
 	t.Helper()
-	r, err := loadEmbeddedRegion()
+	r, err := LoadEmbedded()
 	if err != nil {
 		t.Fatal(err)
 	}
-	return r.ByID[defaultLakeID].Catchment
+	return r.ByID[DefaultLakeID].Catchment
 }
 
 func TestZonesLoad(t *testing.T) {
@@ -35,39 +35,17 @@ func TestPartsSumToTotal(t *testing.T) {
 	}
 }
 
-func TestTonnesFormat(t *testing.T) {
-	for in, want := range map[float64]string{
-		0: "0", 999: "999", 1000: "1,000", 12003: "12,003",
-		141386: "1,41,386", 1128950: "11,28,950", 12345678: "1,23,45,678",
-	} {
-		if got := tonnes(in); got != want {
-			t.Errorf("tonnes(%.0f) = %q, want %q", in, got, want)
-		}
-	}
-}
-
-// Gemini is told to lead with the first fix, so it must be the biggest saving.
-func TestFactsFixesSorted(t *testing.T) {
-	c := testCatchment(t)
-	lake := &Lake{LakeMeta: LakeMeta{ID: "jaisamand", Name: "Jaisamand Lake"}, Catchment: c}
-	facts := zoneFacts(lake, c.ByID["Z13"])
-	fixes := facts["fixes"].([]map[string]any)
-	if fixes[0]["fix"] != "contour trenches plus revegetation" {
-		t.Errorf("Z13 first fix = %v, want trenches plus revegetation", fixes[0]["fix"])
-	}
-}
-
 // The embedded data loads into lakes; zones without lake_id go to Jaisamand.
 func TestLoadRegion(t *testing.T) {
-	r, err := loadEmbeddedRegion()
+	r, err := LoadEmbedded()
 	if err != nil {
 		t.Fatal(err)
 	}
-	jai, ok := r.ByID[defaultLakeID]
+	jai, ok := r.ByID[DefaultLakeID]
 	if !ok {
-		t.Fatalf("no %s lake in region", defaultLakeID)
+		t.Fatalf("no %s lake in region", DefaultLakeID)
 	}
-	if len(jai.Zones) != 19 || jai.Zones[0].LakeID != defaultLakeID {
+	if len(jai.Zones) != 19 || jai.Zones[0].LakeID != DefaultLakeID {
 		t.Errorf("jaisamand: %d zones, lake_id %q", len(jai.Zones), jai.Zones[0].LakeID)
 	}
 	for _, l := range r.Lakes {
@@ -87,7 +65,7 @@ func TestLoadRegion(t *testing.T) {
 func TestSimulate(t *testing.T) {
 	c := testCatchment(t)
 
-	none := c.simulate(nil)
+	none := c.Simulate(nil)
 	if none.SavedT != 0 {
 		t.Errorf("no fixes saved %.0f t, want 0", none.SavedT)
 	}
@@ -96,11 +74,11 @@ func TestSimulate(t *testing.T) {
 	for _, z := range c.Zones {
 		all[z.ID] = Fixes{Bunds: true, Trenches: true, Reveg: true}
 	}
-	r := c.simulate(all)
+	r := c.Simulate(all)
 	if r.ScenarioT >= r.BaselineT {
 		t.Errorf("all fixes did not reduce soil loss: %.0f >= %.0f", r.ScenarioT, r.BaselineT)
 	}
-	if s := c.summary(); math.Abs(s.AllFixesT-r.ScenarioT) > 1 {
+	if s := c.Summary(); math.Abs(s.AllFixesT-r.ScenarioT) > 1 {
 		t.Errorf("summary all-fixes %.0f != simulate %.0f", s.AllFixesT, r.ScenarioT)
 	}
 
@@ -110,7 +88,7 @@ func TestSimulate(t *testing.T) {
 		for _, z := range c.Zones {
 			one[z.ID] = f
 		}
-		got := c.simulate(one).SavedT
+		got := c.Simulate(one).SavedT
 		if got <= 0 || got >= r.SavedT {
 			t.Errorf("%s saved %.0f t, want between 0 and %.0f", name, got, r.SavedT)
 		}
