@@ -6,6 +6,8 @@
 //	GET  /api/lakes/{lake}/zones                  zone GeoJSON for the map
 //	GET  /api/lakes/{lake}/zones/{id}             one zone's fields
 //	GET  /api/lakes/{lake}/zones/{id}/explain     Gemini explanation (?lang=en|hi)
+//	POST /api/lakes/{lake}/zones/{id}/chat        Gemini answer to a follow-up question
+//	POST /api/lakes/{lake}/zones/{id}/chat/stream the same, streamed as Server-Sent Events
 //	POST /api/lakes/{lake}/simulate               tonnes saved for a set of fixes
 //
 // Run with -pregen to generate every explanation into data/explanations.json,
@@ -16,11 +18,13 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"google.golang.org/genai"
@@ -43,7 +47,7 @@ func main() {
 	}
 
 	ex := &Explainer{
-		model:    envOr("GEMINI_MODEL", "gemini-3-flash-preview"),
+		models:   geminiModels(),
 		fallback: map[string]Explanation{},
 		cache:    map[string]Explanation{},
 	}
@@ -74,11 +78,14 @@ func main() {
 	mux.HandleFunc("GET /api/lakes/{lake}/zones", srv.zones)
 	mux.HandleFunc("GET /api/lakes/{lake}/zones/{id}", srv.zone)
 	mux.HandleFunc("GET /api/lakes/{lake}/zones/{id}/explain", srv.explain)
+	mux.HandleFunc("POST /api/lakes/{lake}/zones/{id}/chat", srv.chat)
+	mux.HandleFunc("POST /api/lakes/{lake}/zones/{id}/chat/stream", srv.chatStream)
 	mux.HandleFunc("POST /api/lakes/{lake}/simulate", srv.simulate)
 
 	addr := ":" + envOr("PORT", "8080")
-	log.Printf("JalRakshak API on %s (%d lakes, model %s)", addr, len(region.Lakes), ex.model)
-	log.Fatal(http.ListenAndServe(addr, cors(mux)))
+	log.Printf("JalRakshak API on %s (%d lakes, models %s)", addr, len(region.Lakes), strings.Join(ex.models, " > "))
+	// Inside cors, so preflight OPTIONS requests aren't logged.
+	log.Fatal(http.ListenAndServe(addr, cors(logRequests(mux))))
 }
 
 func loadEmbeddedRegion() (*Region, error) {
@@ -181,6 +188,143 @@ func (s *server) explain(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Limits on a chat request, so one client can't send a huge prompt.
+const (
+	maxChatTurns    = 20
+	maxChatMsgLen   = 1000 // per user question, in characters
+	maxChatReplyLen = 4000 // per earlier Gemini reply sent back as history
+	chatBodyMaxLen  = 64 << 10
+)
+
+type chatRequest struct {
+	Lang     string        `json:"lang"`
+	Messages []ChatMessage `json:"messages"`
+}
+
+// chatInput reads and checks a chat request, writing a 4xx if it is invalid.
+// Body: {"lang": "en", "messages": [{"role": "user", "text": "..."}, ...]}
+// The whole conversation is sent each time (the server keeps no history);
+// it must end with the user's new question.
+func (s *server) chatInput(w http.ResponseWriter, r *http.Request) (*Lake, *Zone, chatRequest, bool) {
+	var req chatRequest
+	l, z, ok := s.zoneOf(w, r)
+	if !ok {
+		return nil, nil, req, false
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, chatBodyMaxLen)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return nil, nil, req, false
+	}
+	if req.Lang == "" {
+		req.Lang = "en"
+	}
+	if _, ok := langNames[req.Lang]; !ok {
+		writeError(w, http.StatusBadRequest, "lang must be en or hi")
+		return nil, nil, req, false
+	}
+	if msg := checkChat(req.Messages); msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return nil, nil, req, false
+	}
+	return l, z, req, true
+}
+
+// chatStream answers as Server-Sent Events while Gemini writes:
+//
+//	data: {"text": "piece of the answer"}   (repeated)
+//	data: {"done": true}                     (finished)
+//	data: {"error": "chat unavailable"}      (failed part-way)
+//
+// Errors before the stream starts are ordinary JSON responses, as in chat.
+func (s *server) chatStream(w http.ResponseWriter, r *http.Request) {
+	l, z, req, ok := s.chatInput(w, r)
+	if !ok {
+		return
+	}
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, http.StatusInternalServerError, "streaming unsupported")
+		return
+	}
+	if s.ex.client == nil {
+		writeError(w, http.StatusServiceUnavailable, "chat needs Gemini, which is not configured")
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no") // proxies: don't hold events back
+	w.WriteHeader(http.StatusOK)
+	send := func(event map[string]any) error {
+		b, _ := json.Marshal(event)
+		if _, err := fmt.Fprintf(w, "data: %s\n\n", b); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	defer cancel()
+	err := s.ex.chatStream(ctx, l, z, req.Lang, req.Messages, func(text string) error {
+		return send(map[string]any{"text": text})
+	})
+	if err != nil {
+		if r.Context().Err() == nil { // not just the client leaving
+			log.Printf("chat stream %s/%s/%s: %v", l.ID, z.ID, req.Lang, err)
+			send(map[string]any{"error": "chat unavailable"})
+		}
+		return
+	}
+	send(map[string]any{"done": true})
+}
+
+// chat answers in one JSON response: {"reply": "..."}.
+func (s *server) chat(w http.ResponseWriter, r *http.Request) {
+	l, z, req, ok := s.chatInput(w, r)
+	if !ok {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
+	defer cancel()
+	reply, err := s.ex.chat(ctx, l, z, req.Lang, req.Messages)
+	if errors.Is(err, errNoGemini) {
+		writeError(w, http.StatusServiceUnavailable, "chat needs Gemini, which is not configured")
+		return
+	}
+	if err != nil {
+		log.Printf("chat %s/%s/%s: %v", l.ID, z.ID, req.Lang, err)
+		writeError(w, http.StatusBadGateway, "chat unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"reply": reply})
+}
+
+// checkChat returns why a conversation is invalid, or "" if it is fine.
+func checkChat(msgs []ChatMessage) string {
+	if len(msgs) == 0 || len(msgs) > maxChatTurns {
+		return fmt.Sprintf("messages must hold 1 to %d turns", maxChatTurns)
+	}
+	for i, m := range msgs {
+		limit := maxChatMsgLen
+		switch m.Role {
+		case "user":
+		case "model":
+			limit = maxChatReplyLen
+		default:
+			return "role must be user or model"
+		}
+		if strings.TrimSpace(m.Text) == "" || len([]rune(m.Text)) > limit {
+			return fmt.Sprintf("message %d must be 1 to %d characters", i+1, limit)
+		}
+	}
+	if msgs[len(msgs)-1].Role != "user" {
+		return "the last message must be from the user"
+	}
+	return ""
+}
+
 // simulate body: {"all": {...fixes}, "zones": {"Z14": {...fixes}}}
 // "all" applies to every zone; entries in "zones" override it per zone.
 func (s *server) simulate(w http.ResponseWriter, r *http.Request) {
@@ -266,6 +410,37 @@ func cors(next http.Handler) http.Handler {
 	})
 }
 
+// logRequests prints one line per request: method, path, status and time
+// taken. Health checks are skipped; Cloud Run probes them constantly.
+func logRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		if r.URL.Path != "/healthz" {
+			log.Printf("%s %s %d %s", r.Method, r.URL.RequestURI(), rec.status, time.Since(start).Round(time.Millisecond))
+		}
+	})
+}
+
+// statusRecorder remembers the response status for logging.
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
+// Flush passes through, so streamed chat answers still arrive piece by piece.
+func (s *statusRecorder) Flush() {
+	if f, ok := s.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -274,6 +449,25 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+// defaultModels are tried in order. Each has its own daily quota on the free
+// tier, so a later one keeps the app working when an earlier one runs out.
+// Flash-Lite first: 2–5 s per explanation against 20–40 s for 3.5 Flash,
+// with the same numbers (they are precomputed; the model only words them).
+const defaultModels = "gemini-3.1-flash-lite,gemini-3.5-flash,gemini-3-flash-preview"
+
+// geminiModels reads GEMINI_MODELS (comma-separated, first is preferred).
+// GEMINI_MODEL, the older single-model setting, still works.
+func geminiModels() []string {
+	list := envOr("GEMINI_MODELS", envOr("GEMINI_MODEL", defaultModels))
+	var models []string
+	for _, m := range strings.Split(list, ",") {
+		if m = strings.TrimSpace(m); m != "" {
+			models = append(models, m)
+		}
+	}
+	return models
 }
 
 func envOr(key, def string) string {

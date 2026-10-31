@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -95,8 +98,10 @@ var explanationSchema = &genai.Schema{
 // Explainer calls Gemini and caches answers per lake, zone and language.
 // If Gemini is unavailable it serves pre-generated answers (data/explanations.json).
 type Explainer struct {
-	client   *genai.Client // nil when no API key is configured
-	model    string
+	client *genai.Client // nil when no API key is configured
+	// Tried in order: when one is out of quota or overloaded, the next
+	// gets the same request.
+	models   []string
 	fallback map[string]Explanation
 
 	mu    sync.RWMutex
@@ -104,6 +109,49 @@ type Explainer struct {
 }
 
 func cacheKey(lakeID, zoneID, lang string) string { return lakeID + "|" + zoneID + "|" + lang }
+
+// geminiStatus is the HTTP status of a Gemini API error, or 0.
+func geminiStatus(err error) int {
+	var apiErr genai.APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.Code
+	}
+	return 0
+}
+
+// tryNextModel reports whether another model might succeed where this one
+// failed: out of quota (429), overloaded (503) or timed out on Google's side
+// (504). Quotas are per model.
+func tryNextModel(err error) bool {
+	switch geminiStatus(err) {
+	case http.StatusTooManyRequests, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	}
+	return false
+}
+
+// setThinking sets how long model may think before answering.
+func setThinking(config *genai.GenerateContentConfig, model string, level genai.ThinkingLevel) {
+	config.ThinkingConfig = nil
+	if strings.HasPrefix(model, "gemini-3") {
+		config.ThinkingConfig = &genai.ThinkingConfig{ThinkingLevel: level}
+	}
+}
+
+// withModels runs call with each model in turn until one succeeds or fails
+// for a reason another model wouldn't fix.
+func withModels[T any](e *Explainer, what string, call func(model string) (T, error)) (T, error) {
+	var result T
+	var err error
+	for i, model := range e.models {
+		result, err = call(model)
+		if err == nil || !tryNextModel(err) || i == len(e.models)-1 {
+			return result, err
+		}
+		log.Printf("%s: %s unavailable (%d), trying %s", what, model, geminiStatus(err), e.models[i+1])
+	}
+	return result, err
+}
 
 // explain returns the explanation and where it came from: "cache", "gemini" or "fallback".
 func (e *Explainer) explain(ctx context.Context, lake *Lake, z *Zone, lang string) (Explanation, string, error) {
@@ -147,19 +195,143 @@ func (e *Explainer) generate(ctx context.Context, lake *Lake, z *Zone, lang stri
 		ResponseMIMEType:  "application/json",
 		ResponseSchema:    explanationSchema,
 	}
-	if strings.HasPrefix(e.model, "gemini-3") {
-		config.ThinkingConfig = &genai.ThinkingConfig{ThinkingLevel: genai.ThinkingLevelLow}
+
+	return withModels(e, "explain", func(model string) (Explanation, error) {
+		setThinking(config, model, genai.ThinkingLevelMinimal)
+		res, err := e.client.Models.GenerateContent(ctx, model, genai.Text(prompt), config)
+		if err != nil {
+			return Explanation{}, fmt.Errorf("gemini %s: %w", model, err)
+		}
+		var ex Explanation
+		if err := json.Unmarshal([]byte(res.Text()), &ex); err != nil {
+			return Explanation{}, fmt.Errorf("gemini %s returned invalid JSON: %w", model, err)
+		}
+		return ex, nil
+	})
+}
+
+// ChatMessage is one turn of a follow-up conversation about a zone.
+type ChatMessage struct {
+	Role string `json:"role"` // "user" or "model"
+	Text string `json:"text"`
+}
+
+const chatPrompt = `You answer follow-up questions for JalRakshak, a tool for gram panchayats,
+watershed committees and farmers around lakes in the Aravalli hills of Rajasthan.
+The user is looking at one zone of a lake's catchment. Its data and the explanation
+they have already read are below. The numbers come from a soil-erosion model built on satellite data.
+
+Rules:
+- Ground answers in the zone data. Copy numbers exactly as written; never invent, recompute
+  or estimate numbers (costs, yields, distances, dates, subsidy amounts).
+- If the data cannot answer the question, say so plainly and suggest who can help: the gram
+  panchayat, the block agriculture or watershed office, or the Krishi Vigyan Kendra.
+- Stay on soil, water, farming, the lake and watershed works. Politely decline other topics.
+- Answer the question actually asked first, then add context if it helps.
+- On funding: contour bunds, contour trenches, revegetation, gully plugs and check dams can be
+  done as MGNREGA watershed works, through the gram panchayat. Never quote amounts or rates.
+- Plain words a farmer or panchayat member understands. No jargon like RUSLE, NDVI or "C factor".
+- Be short: 2–5 sentences, or up to 4 lines starting with "- ". Plain text only, no headings,
+  bold or tables.
+- Write only in the requested language. Only when answering in Hindi, use everyday rural words:
+  मेड़बंदी (contour bunds), कंटूर खाई (contour trenches), पौधारोपण और घास लगाना (revegetation),
+  गली प्लग (gully plugs), चेक डैम (check dams), मनरेगा (MGNREGA). Write numbers in digits as given.`
+
+// errNoGemini means chat needs a live Gemini client; there is no fallback.
+var errNoGemini = errors.New("gemini is not configured")
+
+// saved returns an explanation already generated for the zone, if any.
+func (e *Explainer) saved(lake *Lake, z *Zone, lang string) (Explanation, bool) {
+	key := cacheKey(lake.ID, z.ID, lang)
+	e.mu.RLock()
+	ex, ok := e.cache[key]
+	e.mu.RUnlock()
+	if !ok {
+		ex, ok = e.fallback[key]
+	}
+	return ex, ok
+}
+
+// chat answers the last user message in history about one zone.
+func (e *Explainer) chat(ctx context.Context, lake *Lake, z *Zone, lang string, history []ChatMessage) (string, error) {
+	contents, config, err := e.chatRequest(lake, z, lang, history)
+	if err != nil {
+		return "", err
+	}
+	return withModels(e, "chat", func(model string) (string, error) {
+		setThinking(config, model, genai.ThinkingLevelMinimal)
+		res, err := e.client.Models.GenerateContent(ctx, model, contents, config)
+		if err != nil {
+			return "", fmt.Errorf("gemini %s: %w", model, err)
+		}
+		reply := strings.TrimSpace(res.Text())
+		if reply == "" {
+			return "", errors.New("gemini returned an empty reply")
+		}
+		return reply, nil
+	})
+}
+
+// chatStream is chat, passing the answer to onText piece by piece as
+// Gemini writes it. An error from onText (client gone) stops the stream.
+func (e *Explainer) chatStream(ctx context.Context, lake *Lake, z *Zone, lang string, history []ChatMessage, onText func(string) error) error {
+	contents, config, err := e.chatRequest(lake, z, lang, history)
+	if err != nil {
+		return err
+	}
+	// Quota and overload errors come before any text, so the next model can
+	// still take over without the user seeing a half answer.
+	_, err = withModels(e, "chat stream", func(model string) (struct{}, error) {
+		setThinking(config, model, genai.ThinkingLevelMinimal)
+		wrote := false
+		for res, err := range e.client.Models.GenerateContentStream(ctx, model, contents, config) {
+			if err != nil {
+				if wrote {
+					// Too late to switch models: part of the answer is out.
+					return struct{}{}, fmt.Errorf("gemini %s stopped mid-answer: %v", model, err)
+				}
+				return struct{}{}, fmt.Errorf("gemini %s: %w", model, err)
+			}
+			if text := res.Text(); text != "" {
+				wrote = true
+				if err := onText(text); err != nil {
+					return struct{}{}, err
+				}
+			}
+		}
+		if !wrote {
+			return struct{}{}, errors.New("gemini returned an empty reply")
+		}
+		return struct{}{}, nil
+	})
+	return err
+}
+
+// chatRequest builds the Gemini request for a zone conversation.
+func (e *Explainer) chatRequest(lake *Lake, z *Zone, lang string, history []ChatMessage) ([]*genai.Content, *genai.GenerateContentConfig, error) {
+	if e.client == nil {
+		return nil, nil, errNoGemini
+	}
+	facts, err := json.MarshalIndent(zoneFacts(lake, z), "", "  ")
+	if err != nil {
+		return nil, nil, err
+	}
+	system := fmt.Sprintf("%s\n\nAnswer in %s.\n\nZone data:\n%s", chatPrompt, langNames[lang], facts)
+	if ex, ok := e.saved(lake, z, lang); ok {
+		shown, _ := json.MarshalIndent(ex, "", "  ")
+		system += "\n\nExplanation the user has already read:\n" + string(shown)
 	}
 
-	res, err := e.client.Models.GenerateContent(ctx, e.model, genai.Text(prompt), config)
-	if err != nil {
-		return Explanation{}, fmt.Errorf("gemini: %w", err)
+	contents := make([]*genai.Content, 0, len(history))
+	for _, m := range history {
+		contents = append(contents, genai.NewContentFromText(m.Text, genai.Role(m.Role)))
 	}
-	var ex Explanation
-	if err := json.Unmarshal([]byte(res.Text()), &ex); err != nil {
-		return Explanation{}, fmt.Errorf("gemini returned invalid JSON: %w", err)
+	// Thinking is set per model by the caller: minimal, so a chat answer
+	// starts appearing quickly (the numbers are precomputed anyway).
+	config := &genai.GenerateContentConfig{
+		SystemInstruction: &genai.Content{Parts: []*genai.Part{{Text: system}}},
 	}
-	return ex, nil
+	return contents, config, nil
 }
 
 // zoneFacts is what Gemini sees: numbers already rounded and formatted, and
@@ -191,10 +363,10 @@ func zoneFacts(lake *Lake, z *Zone) map[string]any {
 	fixList := []map[string]any{}
 	for _, f := range fixes {
 		fixList = append(fixList, map[string]any{
-			"fix":                   f.name,
-			"applies_to":            f.appliesTo,
-			"tonnes_saved_per_year": tonnes(f.saved),
-			"pct_of_zone_total":     fmt.Sprintf("%.0f%%", pct(f.saved, z.TTotal)),
+			"fix":                         f.name,
+			"applies_to":                  f.appliesTo,
+			"tonnes_saved_per_year":       tonnes(f.saved),
+			"pct_of_zone_soil_loss_saved": fmt.Sprintf("%.0f%%", pct(f.saved, z.TTotal)),
 		})
 	}
 

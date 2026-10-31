@@ -1,0 +1,11 @@
+# Never copy secrets into the image.
+.env
+.env.*
+
+# Not needed to build.
+*_test.go
+README.md
+Dockerfile
+.dockerignore
+.gcloudignore
+.gitignore
