@@ -1,4 +1,6 @@
-package main
+// Package catchment holds the erosion model's results per lake and zone,
+// and the simulator that applies soil-saving fixes to them.
+package catchment
 
 import (
 	"encoding/json"
@@ -118,8 +120,8 @@ type SimResult struct {
 	Zones     []ZoneResult `json:"zones"`
 }
 
-// simulate applies fixes per zone ID. Zones not in the map stay at baseline.
-func (c *Catchment) simulate(fixes map[string]Fixes) SimResult {
+// Simulate applies fixes per zone ID. Zones not in the map stay at baseline.
+func (c *Catchment) Simulate(fixes map[string]Fixes) SimResult {
 	var r SimResult
 	for _, z := range c.Zones {
 		scen := z.tonnes(fixes[z.ID])
@@ -130,12 +132,12 @@ func (c *Catchment) simulate(fixes map[string]Fixes) SimResult {
 			BaselineT:   round(z.TTotal, 0),
 			ScenarioT:   round(scen, 0),
 			SavedT:      round(z.TTotal-scen, 0),
-			SavedPct:    round(pct(z.TTotal-scen, z.TTotal), 1),
+			SavedPct:    round(Pct(z.TTotal-scen, z.TTotal), 1),
 			SoilLossNew: round(scen/(z.LandKm2*100), 2),
 		})
 	}
 	r.SavedT = round(r.BaselineT-r.ScenarioT, 0)
-	r.SavedPct = round(pct(r.BaselineT-r.ScenarioT, r.BaselineT), 1)
+	r.SavedPct = round(Pct(r.BaselineT-r.ScenarioT, r.BaselineT), 1)
 	r.BaselineT = round(r.BaselineT, 0)
 	r.ScenarioT = round(r.ScenarioT, 0)
 	return r
@@ -155,7 +157,7 @@ type Summary struct {
 	ZoneTypeCounts map[string]int `json:"zone_type_counts"`
 }
 
-func (c *Catchment) summary() Summary {
+func (c *Catchment) Summary() Summary {
 	s := Summary{Zones: len(c.Zones), ClassCounts: map[string]int{}, ZoneTypeCounts: map[string]int{}}
 	all := Fixes{Bunds: true, Trenches: true, Reveg: true}
 	for _, z := range c.Zones {
@@ -169,7 +171,7 @@ func (c *Catchment) summary() Summary {
 		s.ZoneTypeCounts[z.Type]++
 	}
 	s.MeanSoilLoss = round(s.TotalT/(s.LandKm2*100), 2)
-	s.AllFixesPct = round(pct(s.TotalT-s.AllFixesT, s.TotalT), 1)
+	s.AllFixesPct = round(Pct(s.TotalT-s.AllFixesT, s.TotalT), 1)
 	s.LandKm2 = round(s.LandKm2, 0)
 	s.TotalT = round(s.TotalT, 0)
 	s.CropT = round(s.CropT, 0)
@@ -179,7 +181,8 @@ func (c *Catchment) summary() Summary {
 	return s
 }
 
-func pct(part, whole float64) float64 {
+// Pct is part as a percentage of whole, or 0 when whole is 0.
+func Pct(part, whole float64) float64 {
 	if whole == 0 {
 		return 0
 	}

@@ -4,6 +4,7 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/l10n/l10n.dart';
+import '../../../core/layout/breakpoints.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/formatters.dart';
@@ -24,40 +25,52 @@ class LakesPage extends ConsumerWidget {
       body: AsyncView(
         value: ref.watch(lakesProvider),
         onRetry: () => ref.invalidate(lakesProvider),
-        data: (lakes) => CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(child: _RegionHeader(lakes: lakes)),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-              sliver: SliverToBoxAdapter(
-                child: Text(
-                  context.l10n.lakesByRate,
-                  style: emphasized(context).titleMedium,
+        data: (lakes) => LayoutBuilder(
+          builder: (context, c) {
+            final side = gutter(c.maxWidth, maxWidth: 1200);
+            final columns = c.maxWidth >= Breakpoints.twoColumns ? 2 : 1;
+            return CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: _RegionHeader(lakes: lakes, side: side),
                 ),
-              ),
-            ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              sliver: SliverList.separated(
-                itemCount: lakes.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (context, i) => FadeSlideIn(
-                  index: i,
-                  child: LakeCard(
-                    lake: lakes[i],
-                    rank: i + 1,
-                    onOpen: () {
-                      Haptics.tap();
-                      ref
-                          .read(selectedLakeIdProvider.notifier)
-                          .select(lakes[i].id);
-                      context.go(Routes.map);
-                    },
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(side, 20, side, 4),
+                  sliver: SliverToBoxAdapter(
+                    child: Text(
+                      context.l10n.lakesByRate,
+                      style: emphasized(context).titleMedium,
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ],
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(side, 8, side, 24),
+                  sliver: SliverToBoxAdapter(
+                    child: ResponsiveColumns(
+                      columns: columns,
+                      children: [
+                        for (final (i, lake) in lakes.indexed)
+                          FadeSlideIn(
+                            index: i,
+                            child: LakeCard(
+                              lake: lake,
+                              rank: i + 1,
+                              onOpen: () {
+                                Haptics.tap();
+                                ref
+                                    .read(selectedLakeIdProvider.notifier)
+                                    .select(lake.id);
+                                context.go(Routes.map);
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -65,9 +78,12 @@ class LakesPage extends ConsumerWidget {
 }
 
 class _RegionHeader extends StatelessWidget {
-  const _RegionHeader({required this.lakes});
+  const _RegionHeader({required this.lakes, required this.side});
 
   final List<Lake> lakes;
+
+  /// Side gutter of the page, so the header lines up with the cards.
+  final double side;
 
   @override
   Widget build(BuildContext context) {
@@ -80,9 +96,9 @@ class _RegionHeader extends StatelessWidget {
 
     return Container(
       padding: EdgeInsets.fromLTRB(
-        20,
+        side + 4,
         MediaQuery.paddingOf(context).top + 12,
-        12,
+        side - 4,
         28,
       ),
       decoration: BoxDecoration(

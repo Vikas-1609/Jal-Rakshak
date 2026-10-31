@@ -434,4 +434,141 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get aboutBody =>
       'JalRakshak estimates soil erosion around Aravalli lakes from satellite data and suggests soil-saving works. Built for the GDG Udaipur Aravalli Build Championship.';
+
+  @override
+  String get chatTitle => 'Ask about this zone';
+
+  @override
+  String get chatIntro =>
+      'Have a question the explanation didn\'t cover? Ask Gemini. It answers from this zone\'s numbers.';
+
+  @override
+  String get chatSuggest1 => 'Which fix should we start with?';
+
+  @override
+  String get chatSuggest2 => 'Can this be done under MGNREGA?';
+
+  @override
+  String get chatSuggest3 => 'What can farmers do this season?';
+
+  @override
+  String get chatHint => 'Ask a follow-up question';
+
+  @override
+  String get chatSend => 'Send';
+
+  @override
+  String get chatThinking => 'Gemini is thinking…';
+
+  @override
+  String chatError(String error) {
+    return 'No answer: $error';
+  }
+
+  @override
+  String get chatClear => 'Clear chat';
+
+  @override
+  String get mapNoKey =>
+      'The map needs a Google Maps API key. Add MAPS_API_KEY to app/.env and run with --dart-define-from-file=.env.';
+
+  @override
+  String get mapKeyRejected =>
+      'Google Maps rejected the API key. Check that the Maps JavaScript API is enabled and that the key\'s website restrictions include this site.';
+
+  @override
+  String get chatFootnote =>
+      'Gemini answers from this zone\'s numbers and can make mistakes. Check with your block office before spending money.';
+
+  @override
+  String get videosTitle => 'Learn how: video guides';
+
+  @override
+  String get exportReport => 'Export PDF report';
+
+  @override
+  String get exportingReport => 'Preparing report…';
+
+  @override
+  String exportFailed(String error) {
+    return 'Couldn\'t create the report: $error';
+  }
+
+  @override
+  String reportTitle(String lake) {
+    return 'Soil restoration plan · $lake';
+  }
+
+  @override
+  String reportGenerated(String date) {
+    return 'Generated $date by JalRakshak';
+  }
+
+  @override
+  String get reportBaseline => 'Soil lost per year today';
+
+  @override
+  String get reportWithPlan => 'With this plan';
+
+  @override
+  String get reportSaved => 'Kept in place';
+
+  @override
+  String reportZonesTreated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count zones treated',
+      one: '1 zone treated',
+      zero: 'No zones treated yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reportMapTitle => 'Catchment zones with the plan applied';
+
+  @override
+  String get reportMapCaption =>
+      'Colour shows soil loss per hectare with the plan applied: green is low, red is severe.';
+
+  @override
+  String get reportZoneTable => 'Zone by zone';
+
+  @override
+  String get colZone => 'Zone';
+
+  @override
+  String get colType => 'Type';
+
+  @override
+  String get colRate => 't/ha/yr';
+
+  @override
+  String get colPerYear => 'Lost / yr';
+
+  @override
+  String get colFixes => 'Fixes';
+
+  @override
+  String get colSaved => 'Saved / yr';
+
+  @override
+  String get noFixes => 'None';
+
+  @override
+  String get reportInsights => 'Why the worst zones erode';
+
+  @override
+  String get reportWhy => 'Why';
+
+  @override
+  String get reportActions => 'What to do';
+
+  @override
+  String get reportTip => 'Tip for farmers';
+
+  @override
+  String get reportFootnote =>
+      'Estimates from a RUSLE soil-erosion model on satellite data, for comparing places, not measurements. Explanations written by Gemini and can contain mistakes.';
 }

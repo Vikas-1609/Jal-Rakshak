@@ -1,4 +1,6 @@
-package main
+// Package config reads settings from the environment, and from a .env file
+// for local runs.
+package config
 
 import (
 	"bufio"
@@ -6,9 +8,9 @@ import (
 	"strings"
 )
 
-// loadDotEnv reads KEY=VALUE lines from path into the environment, for local runs.
+// LoadDotEnv reads KEY=VALUE lines from path into the environment, for local runs.
 // Variables already set (e.g. on Cloud Run) are left alone. A missing file is fine.
-func loadDotEnv(path string) error {
+func LoadDotEnv(path string) error {
 	f, err := os.Open(path)
 	if os.IsNotExist(err) {
 		return nil
@@ -35,4 +37,12 @@ func loadDotEnv(path string) error {
 		}
 	}
 	return sc.Err()
+}
+
+// EnvOr returns the environment variable key, or def if it is unset or empty.
+func EnvOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
 }

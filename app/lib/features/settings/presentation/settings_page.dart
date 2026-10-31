@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/l10n/l10n.dart';
+import '../../../core/layout/breakpoints.dart';
 import '../../../core/utils/haptics.dart';
 import '../../../core/widgets/animations.dart';
 import '../../../core/widgets/common.dart';
@@ -79,21 +81,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ],
         ),
       ),
-      SectionCard(
-        child: M3EListItem(
-          headline: l.hapticsTitle,
-          supportingText: l.hapticsSub,
-          leading: const Icon(Icons.vibration),
-          trailing: M3ESwitch(
-            value: settings.haptics,
-            selectedIcon: const Icon(Icons.check),
-            onChanged: (v) {
-              controller.setHaptics(v);
-              Haptics.selection();
-            },
+      // Browsers don't vibrate.
+      if (!kIsWeb)
+        SectionCard(
+          child: M3EListItem(
+            headline: l.hapticsTitle,
+            supportingText: l.hapticsSub,
+            leading: const Icon(Icons.vibration),
+            trailing: M3ESwitch(
+              value: settings.haptics,
+              selectedIcon: const Icon(Icons.check),
+              onChanged: (v) {
+                controller.setHaptics(v);
+                Haptics.selection();
+              },
+            ),
           ),
         ),
-      ),
       SectionCard(
         title: l.savedExplanations,
         icon: Icons.offline_pin_outlined,
@@ -129,11 +133,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           onPressed: () => Navigator.maybePop(context),
         ),
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        itemCount: sections.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (context, i) => FadeSlideIn(index: i, child: sections[i]),
+      body: LayoutBuilder(
+        builder: (context, c) {
+          final side = gutter(c.maxWidth, maxWidth: 720);
+          return ListView.separated(
+            padding: EdgeInsets.fromLTRB(side, 8, side, 32),
+            itemCount: sections.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemBuilder: (context, i) =>
+                FadeSlideIn(index: i, child: sections[i]),
+          );
+        },
       ),
     );
   }

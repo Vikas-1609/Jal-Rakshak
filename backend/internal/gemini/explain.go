@@ -1,14 +1,22 @@
-package main
+// Package gemini turns a zone's model results into plain-language advice:
+// a structured explanation per zone and language, and follow-up chat.
+// It falls back across Gemini models when one is out of quota, and to saved
+// explanations when Gemini is unreachable.
+package gemini
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
-	"strings"
+	"log"
+	"os"
 	"sync"
+	"time"
 
 	"google.golang.org/genai"
+
+	"jalrakshak/backend/data"
+	"jalrakshak/backend/internal/catchment"
 )
 
 // Explanation is the structured answer Gemini returns for one zone.
@@ -25,6 +33,7 @@ type Action struct {
 	Impact string `json:"impact"`
 }
 
+// langNames are the supported answer languages, as told to Gemini.
 var langNames = map[string]string{
 	"en": "English",
 	"hi": "Hindi, in Devanagari script",
@@ -95,8 +104,10 @@ var explanationSchema = &genai.Schema{
 // Explainer calls Gemini and caches answers per lake, zone and language.
 // If Gemini is unavailable it serves pre-generated answers (data/explanations.json).
 type Explainer struct {
-	client   *genai.Client // nil when no API key is configured
-	model    string
+	client *genai.Client // nil when no API key is configured
+	// Tried in order: when one is out of quota or overloaded, the next
+	// gets the same request.
+	models   []string
 	fallback map[string]Explanation
 
 	mu    sync.RWMutex
@@ -105,8 +116,8 @@ type Explainer struct {
 
 func cacheKey(lakeID, zoneID, lang string) string { return lakeID + "|" + zoneID + "|" + lang }
 
-// explain returns the explanation and where it came from: "cache", "gemini" or "fallback".
-func (e *Explainer) explain(ctx context.Context, lake *Lake, z *Zone, lang string) (Explanation, string, error) {
+// Explain returns the explanation and where it came from: "cache", "gemini" or "fallback".
+func (e *Explainer) Explain(ctx context.Context, lake *catchment.Lake, z *catchment.Zone, lang string) (Explanation, string, error) {
 	key := cacheKey(lake.ID, z.ID, lang)
 	e.mu.RLock()
 	ex, ok := e.cache[key]
@@ -135,7 +146,7 @@ func (e *Explainer) explain(ctx context.Context, lake *Lake, z *Zone, lang strin
 	return Explanation{}, "", fmt.Errorf("no Gemini client and no saved explanation for %s", key)
 }
 
-func (e *Explainer) generate(ctx context.Context, lake *Lake, z *Zone, lang string) (Explanation, error) {
+func (e *Explainer) generate(ctx context.Context, lake *catchment.Lake, z *catchment.Zone, lang string) (Explanation, error) {
 	facts, err := json.MarshalIndent(zoneFacts(lake, z), "", "  ")
 	if err != nil {
 		return Explanation{}, err
@@ -147,100 +158,93 @@ func (e *Explainer) generate(ctx context.Context, lake *Lake, z *Zone, lang stri
 		ResponseMIMEType:  "application/json",
 		ResponseSchema:    explanationSchema,
 	}
-	if strings.HasPrefix(e.model, "gemini-3") {
-		config.ThinkingConfig = &genai.ThinkingConfig{ThinkingLevel: genai.ThinkingLevelLow}
-	}
 
-	res, err := e.client.Models.GenerateContent(ctx, e.model, genai.Text(prompt), config)
-	if err != nil {
-		return Explanation{}, fmt.Errorf("gemini: %w", err)
-	}
-	var ex Explanation
-	if err := json.Unmarshal([]byte(res.Text()), &ex); err != nil {
-		return Explanation{}, fmt.Errorf("gemini returned invalid JSON: %w", err)
-	}
-	return ex, nil
+	return withModels(e, "explain", func(model string) (Explanation, error) {
+		setThinking(config, model, genai.ThinkingLevelMinimal)
+		res, err := e.client.Models.GenerateContent(ctx, model, genai.Text(prompt), config)
+		if err != nil {
+			return Explanation{}, fmt.Errorf("gemini %s: %w", model, err)
+		}
+		var ex Explanation
+		if err := json.Unmarshal([]byte(res.Text()), &ex); err != nil {
+			return Explanation{}, fmt.Errorf("gemini %s returned invalid JSON: %w", model, err)
+		}
+		return ex, nil
+	})
 }
 
-// zoneFacts is what Gemini sees: numbers already rounded and formatted, and
-// fix savings precomputed and sorted, so the model only explains, never calculates.
-func zoneFacts(lake *Lake, z *Zone) map[string]any {
-	c := lake.Catchment
-	var catchT, catchLand float64
-	rankByTonnes := 1
-	for _, other := range c.Zones {
-		catchT += other.TTotal
-		catchLand += other.LandKm2
-		if other.TTotal > z.TTotal {
-			rankByTonnes++
+// SupportedLang reports whether answers can be written in lang ("en", "hi").
+func SupportedLang(lang string) bool {
+	_, ok := langNames[lang]
+	return ok
+}
+
+// New sets up the explainer: models from the environment, saved explanations
+// from the embedded data, and a Gemini client if one can be configured.
+// The client reads GEMINI_API_KEY, or uses Vertex AI if GOOGLE_GENAI_USE_VERTEXAI=true.
+// Without a client, only saved explanations are served and chat is off.
+func New(ctx context.Context) (*Explainer, error) {
+	e := &Explainer{
+		models:   modelsFromEnv(),
+		fallback: map[string]Explanation{},
+		cache:    map[string]Explanation{},
+	}
+	if b, err := data.FS.ReadFile(data.ExplanationsFile); err == nil {
+		if err := json.Unmarshal(b, &e.fallback); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", data.ExplanationsFile, err)
 		}
 	}
-
-	type fix struct {
-		name, appliesTo string
-		saved           float64
+	if client, err := genai.NewClient(ctx, nil); err != nil {
+		log.Printf("Gemini disabled (%v); serving %d saved explanations only", err, len(e.fallback))
+	} else {
+		e.client = client
 	}
-	var fixes []fix
-	if z.TCrop > 0 {
-		fixes = append(fixes, fix{"contour bunds", "cropland", z.TCrop - z.TCropBunds})
-	}
-	if z.THill > 0 {
-		fixes = append(fixes, fix{"contour trenches plus revegetation", "scrub, grass and bare hill land", z.THill - z.THillBoth})
-	}
-	sort.Slice(fixes, func(i, j int) bool { return fixes[i].saved > fixes[j].saved })
-	fixList := []map[string]any{}
-	for _, f := range fixes {
-		fixList = append(fixList, map[string]any{
-			"fix":                   f.name,
-			"applies_to":            f.appliesTo,
-			"tonnes_saved_per_year": tonnes(f.saved),
-			"pct_of_zone_total":     fmt.Sprintf("%.0f%%", pct(f.saved, z.TTotal)),
-		})
-	}
-
-	n := len(c.Zones)
-	return map[string]any{
-		"lake":                             lake.Name,
-		"zone_id":                          z.ID,
-		"zone_type":                        z.Type,
-		"risk_class":                       z.RiskClass,
-		"rank_by_soil_loss_per_hectare":    fmt.Sprintf("%d of %d", z.Rank, n),
-		"rank_by_total_tonnes":             fmt.Sprintf("%d of %d", rankByTonnes, n),
-		"soil_loss_t_per_ha_per_year":      fmt.Sprintf("%.1f", z.SoilLoss),
-		"catchment_average_t_per_ha":       fmt.Sprintf("%.1f", catchT/(catchLand*100)),
-		"zone_soil_loss_tonnes_per_year":   tonnes(z.TTotal),
-		"share_of_catchment_soil_loss_pct": fmt.Sprintf("%.1f%%", pct(z.TTotal, catchT)),
-		"land_area_km2":                    fmt.Sprintf("%.0f", z.LandKm2),
-		"average_slope_deg":                fmt.Sprintf("%.1f", z.SlopeDeg),
-		"annual_rainfall_mm":               fmt.Sprintf("%.0f", z.RainMM),
-		"land_cover_pct": map[string]any{
-			"cropland":         fmt.Sprintf("%.0f%%", z.CropFrac*100),
-			"scrub_grass_bare": fmt.Sprintf("%.0f%%", z.HillFrac*100),
-			"forest":           fmt.Sprintf("%.0f%%", z.TreeFrac*100),
-			"built_up":         fmt.Sprintf("%.0f%%", z.BuiltFrac*100),
-		},
-		"cropland_bare_before_monsoon_pct": fmt.Sprintf("%.0f%%", z.CropBareFrac*100),
-		"soil_loss_tonnes_by_land": map[string]any{
-			"cropland":  tonnes(z.TCrop),
-			"hill_land": tonnes(z.THill),
-			"other":     tonnes(z.TOther),
-		},
-		"fixes": fixList,
-	}
+	return e, nil
 }
 
-// tonnes formats a tonnage with Indian digit grouping: 141386 → "1,41,386".
-func tonnes(v float64) string {
-	s := fmt.Sprintf("%.0f", v)
-	if len(s) <= 3 {
-		return s
+// Enabled reports whether a live Gemini client is configured.
+func (e *Explainer) Enabled() bool { return e.client != nil }
+
+// Models lists the Gemini models in the order they are tried.
+func (e *Explainer) Models() []string { return e.models }
+
+// Pregenerate asks Gemini for every zone's explanation in every language and
+// writes them to path, to embed as the fallback for when Gemini is down.
+func (e *Explainer) Pregenerate(region *catchment.Region, path string) error {
+	if e.client == nil {
+		return fmt.Errorf("set GEMINI_API_KEY to pregenerate")
 	}
-	head, tail := s[:len(s)-3], s[len(s)-3:]
-	var parts []string
-	for len(head) > 2 {
-		parts = append([]string{head[len(head)-2:]}, parts...)
-		head = head[:len(head)-2]
+	out := map[string]Explanation{}
+	for _, l := range region.Lakes {
+		for _, z := range l.Zones {
+			for lang := range langNames {
+				var exp Explanation
+				var err error
+				for attempt := 1; attempt <= 3; attempt++ {
+					ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+					exp, err = e.generate(ctx, l, z, lang)
+					cancel()
+					if err == nil {
+						break
+					}
+					log.Printf("%s/%s/%s attempt %d: %v", l.ID, z.ID, lang, attempt, err)
+					time.Sleep(time.Duration(attempt) * 10 * time.Second) // back off for rate limits
+				}
+				if err != nil {
+					return fmt.Errorf("%s/%s/%s: %w", l.ID, z.ID, lang, err)
+				}
+				out[cacheKey(l.ID, z.ID, lang)] = exp
+				log.Printf("%s/%s/%s: %s", l.ID, z.ID, lang, exp.Headline)
+			}
+		}
 	}
-	parts = append([]string{head}, parts...)
-	return strings.Join(parts, ",") + "," + tail
+	b, err := json.MarshalIndent(out, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, b, 0o644); err != nil {
+		return err
+	}
+	log.Printf("wrote %d explanations to %s; rebuild to embed them", len(out), path)
+	return nil
 }
