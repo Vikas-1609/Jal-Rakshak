@@ -3,6 +3,7 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/l10n/l10n.dart';
+import '../../../core/layout/breakpoints.dart';
 import '../../../core/widgets/common.dart';
 import '../../settings/application/settings_providers.dart';
 import '../application/catchment_providers.dart';
@@ -39,13 +40,18 @@ class ZoneDetailPage extends ConsumerWidget {
         data: (c) {
           final zone = c.byId[zoneId];
           if (zone == null) return ErrorState(message: l.zoneTitle(zoneId));
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-            children: [
-              ZoneHeader(catchment: c, zone: zone),
-              const SizedBox(height: 16),
-              ZoneDetailContent(catchment: c, zone: zone),
-            ],
+          return LayoutBuilder(
+            builder: (context, box) {
+              final side = gutter(box.maxWidth, maxWidth: 840);
+              return ListView(
+                padding: EdgeInsets.fromLTRB(side, 4, side, 24),
+                children: [
+                  ZoneHeader(catchment: c, zone: zone),
+                  const SizedBox(height: 16),
+                  ZoneDetailContent(catchment: c, zone: zone),
+                ],
+              );
+            },
           );
         },
       ),

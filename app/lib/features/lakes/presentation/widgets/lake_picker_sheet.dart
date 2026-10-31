@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import '../../../../core/l10n/l10n.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -14,7 +15,8 @@ Future<void> showLakePicker(BuildContext context) {
   Haptics.selection();
   return M3EBottomSheet.show<void>(
     context,
-    builder: (_) => const _LakePicker(),
+    // Opens over the Google map, which would otherwise take its clicks (web).
+    builder: (_) => PointerInterceptor(child: const _LakePicker()),
   );
 }
 

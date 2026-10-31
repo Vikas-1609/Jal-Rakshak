@@ -1,10 +1,12 @@
-import 'dart:ui' show lerpDouble;
+import 'dart:ui' show PointerDeviceKind, lerpDouble;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import '../../../core/l10n/l10n.dart';
+import '../../../core/layout/breakpoints.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/haptics.dart';
 import '../../../core/widgets/common.dart';
@@ -124,6 +126,9 @@ class _MapBodyState extends ConsumerState<_MapBody> {
       },
       child: LayoutBuilder(
         builder: (context, c) {
+          if (c.maxWidth >= Breakpoints.mapPanel) {
+            return _wideLayout(zone, c.maxWidth);
+          }
           final height = c.maxHeight;
           // The sheet can't be pulled beyond its content.
           final fit = _contentHeight == null
@@ -138,8 +143,6 @@ class _MapBodyState extends ConsumerState<_MapBody> {
           return Stack(
             children: [
               CatchmentMap(
-                // A new map per lake, so it refits the camera to that catchment.
-                key: ValueKey(widget.catchment.lakeId),
                 catchment: widget.catchment,
                 padding: EdgeInsets.only(top: 170, bottom: height * _peekSize),
               ),
@@ -148,10 +151,14 @@ class _MapBodyState extends ConsumerState<_MapBody> {
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    // Interceptors keep clicks on these from reaching the
+                    // Google map underneath (web only; see _SheetSurface).
                     children: [
-                      const LakeSwitcher(),
+                      PointerInterceptor(child: const LakeSwitcher()),
                       const SizedBox(height: 8),
-                      MapStatusCard(catchment: widget.catchment),
+                      PointerInterceptor(
+                        child: MapStatusCard(catchment: widget.catchment),
+                      ),
                     ],
                   ),
                 ),
@@ -173,43 +180,49 @@ class _MapBodyState extends ConsumerState<_MapBody> {
                         : 0.0;
                     return _SheetSurface(
                       t: t,
-                      child: ListView(
-                        controller: scroll,
-                        padding: EdgeInsets.fromLTRB(
-                          16,
-                          10 + MediaQuery.paddingOf(context).top * t,
-                          16,
-                          24,
+                      // Let a mouse drag the sheet too (web, desktop).
+                      child: ScrollConfiguration(
+                        behavior: ScrollConfiguration.of(context).copyWith(
+                          dragDevices: PointerDeviceKind.values.toSet(),
                         ),
-                        children: [
-                          Opacity(opacity: 1 - t, child: const _DragHandle()),
-                          MeasureSize(
-                            onChange: (s) {
-                              // Full screen ignores content height, and
-                              // rebuilding the sheet would cancel the open
-                              // animation (it replaces the sheet's extent).
-                              if (_detail) return;
-                              if (s.height != _contentHeight) {
-                                setState(() => _contentHeight = s.height);
-                              }
-                            },
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 300),
-                              switchInCurve: Curves.easeOutCubic,
-                              transitionBuilder: (child, a) => FadeTransition(
-                                opacity: a,
-                                child: SlideTransition(
-                                  position: Tween(
-                                    begin: const Offset(0, 0.04),
-                                    end: Offset.zero,
-                                  ).animate(a),
-                                  child: child,
-                                ),
-                              ),
-                              child: _content(zone),
-                            ),
+                        child: ListView(
+                          controller: scroll,
+                          padding: EdgeInsets.fromLTRB(
+                            16,
+                            10 + MediaQuery.paddingOf(context).top * t,
+                            16,
+                            24,
                           ),
-                        ],
+                          children: [
+                            Opacity(opacity: 1 - t, child: const _DragHandle()),
+                            MeasureSize(
+                              onChange: (s) {
+                                // Full screen ignores content height, and
+                                // rebuilding the sheet would cancel the open
+                                // animation (it replaces the sheet's extent).
+                                if (_detail) return;
+                                if (s.height != _contentHeight) {
+                                  setState(() => _contentHeight = s.height);
+                                }
+                              },
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 300),
+                                switchInCurve: Curves.easeOutCubic,
+                                transitionBuilder: (child, a) => FadeTransition(
+                                  opacity: a,
+                                  child: SlideTransition(
+                                    position: Tween(
+                                      begin: const Offset(0, 0.04),
+                                      end: Offset.zero,
+                                    ).animate(a),
+                                    child: child,
+                                  ),
+                                ),
+                                child: _content(zone),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },
@@ -222,7 +235,64 @@ class _MapBodyState extends ConsumerState<_MapBody> {
     );
   }
 
-  Widget _content(Zone? zone) {
+  /// Wide windows: the map fills the space, with everything the sheet would
+  /// hold in a panel docked on the left. The zone view opens in the panel.
+  Widget _wideLayout(Zone? zone, double width) {
+    final panelWidth = width >= 1280 ? 460.0 : 400.0;
+    final scheme = Theme.of(context).colorScheme;
+    return Stack(
+      children: [
+        CatchmentMap(
+          catchment: widget.catchment,
+          padding: EdgeInsets.only(left: panelWidth + 24),
+        ),
+        Positioned(
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: panelWidth + 24,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: PointerInterceptor(
+                child: Material(
+                  elevation: 6,
+                  color: scheme.surfaceContainerLow,
+                  shape: const RoundedSuperellipseBorder(
+                    borderRadius: M3EShapes.radiusExtraLarge,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: LakeSwitcher(),
+                      ),
+                      const SizedBox(height: 12),
+                      MapStatusCard(catchment: widget.catchment),
+                      const SizedBox(height: 20),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        switchInCurve: Curves.easeOutCubic,
+                        layoutBuilder: (current, previous) => Stack(
+                          alignment: Alignment.topCenter,
+                          children: [...previous, ?current],
+                        ),
+                        child: _content(zone, wide: true),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _content(Zone? zone, {bool wide = false}) {
     if (zone == null) {
       return LakeOverviewPanel(
         key: const ValueKey('overview'),
@@ -235,6 +305,7 @@ class _MapBodyState extends ConsumerState<_MapBody> {
         catchment: widget.catchment,
         zone: zone,
         onClose: _closeDetail,
+        wide: wide,
       );
     }
     return ZonePreviewPanel(
@@ -258,26 +329,30 @@ class _SheetSurface extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final radius = lerpDouble(M3EShapes.extraLargeIncreased, 0, t)!;
     final surface = Color.lerp(scheme.surfaceContainerLow, scheme.surface, t)!;
-    return Material(
-      elevation: lerpDouble(6, 0, t)!,
-      color: surface,
-      shape: RoundedSuperellipseBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          child,
-          // Once full screen, keep scrolled content out from under the
-          // status bar.
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.paddingOf(context).top * t,
-            child: ColoredBox(color: surface),
-          ),
-        ],
+    // On the web the Google map is an HTML element under Flutter's canvas
+    // and would otherwise take clicks and scrolls meant for the sheet.
+    return PointerInterceptor(
+      child: Material(
+        elevation: lerpDouble(6, 0, t)!,
+        color: surface,
+        shape: RoundedSuperellipseBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(radius)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            child,
+            // Once full screen, keep scrolled content out from under the
+            // status bar.
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: MediaQuery.paddingOf(context).top * t,
+              child: ColoredBox(color: surface),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -290,11 +365,15 @@ class _DetailView extends ConsumerWidget {
     required this.catchment,
     required this.zone,
     required this.onClose,
+    this.wide = false,
   });
 
   final Catchment catchment;
   final Zone zone;
   final VoidCallback onClose;
+
+  /// In the side panel rather than the full-screen sheet.
+  final bool wide;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -307,7 +386,7 @@ class _DetailView extends ConsumerWidget {
           children: [
             M3EIconButton(
               variant: M3EIconButtonVariant.tonal,
-              icon: const Icon(Icons.expand_more),
+              icon: Icon(wide ? Icons.arrow_back : Icons.expand_more),
               tooltip: l.back,
               onPressed: onClose,
             ),

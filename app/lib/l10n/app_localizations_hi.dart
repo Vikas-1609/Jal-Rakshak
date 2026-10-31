@@ -435,4 +435,49 @@ class AppLocalizationsHi extends AppLocalizations {
   @override
   String get aboutBody =>
       'जलरक्षक उपग्रह डेटा से अरावली की झीलों के आसपास मिट्टी कटाव का अनुमान लगाता है और मिट्टी बचाने के उपाय सुझाता है। GDG उदयपुर अरावली बिल्ड चैंपियनशिप के लिए बनाया गया।';
+
+  @override
+  String get chatTitle => 'इस क्षेत्र के बारे में पूछें';
+
+  @override
+  String get chatIntro =>
+      'कोई सवाल जिसका जवाब ऊपर नहीं मिला? Gemini से पूछें। वह इस क्षेत्र के आँकड़ों से जवाब देता है।';
+
+  @override
+  String get chatSuggest1 => 'शुरुआत किस काम से करें?';
+
+  @override
+  String get chatSuggest2 => 'क्या यह काम मनरेगा में हो सकता है?';
+
+  @override
+  String get chatSuggest3 => 'किसान इस मौसम में क्या करें?';
+
+  @override
+  String get chatHint => 'अपना सवाल लिखें';
+
+  @override
+  String get chatSend => 'भेजें';
+
+  @override
+  String get chatThinking => 'Gemini सोच रहा है…';
+
+  @override
+  String chatError(String error) {
+    return 'जवाब नहीं मिला: $error';
+  }
+
+  @override
+  String get chatClear => 'बातचीत मिटाएँ';
+
+  @override
+  String get mapNoKey =>
+      'नक्शे के लिए Google Maps API key चाहिए। app/.env में MAPS_API_KEY जोड़ें और --dart-define-from-file=.env के साथ चलाएँ।';
+
+  @override
+  String get mapKeyRejected =>
+      'Google Maps ने API key अस्वीकार कर दी। जाँचें कि Maps JavaScript API चालू है और key की वेबसाइट पाबंदियों में यह साइट शामिल है।';
+
+  @override
+  String get chatFootnote =>
+      'Gemini इस क्षेत्र के आँकड़ों से जवाब देता है और गलती कर सकता है। पैसा लगाने से पहले ब्लॉक कार्यालय से पूछ लें।';
 }

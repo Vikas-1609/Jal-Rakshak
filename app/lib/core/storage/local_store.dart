@@ -31,6 +31,8 @@ class LocalStore {
   Future<void> writeJson(String key, Map<String, dynamic> value) =>
       _prefs.setString(key, jsonEncode(value));
 
+  Future<void> remove(String key) => _prefs.remove(key);
+
   int countWithPrefix(String prefix) =>
       _prefs.getKeys().where((k) => k.startsWith(prefix)).length;
 

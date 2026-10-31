@@ -805,6 +805,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'JalRakshak estimates soil erosion around Aravalli lakes from satellite data and suggests soil-saving works. Built for the GDG Udaipur Aravalli Build Championship.'**
   String get aboutBody;
+
+  /// No description provided for @chatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask about this zone'**
+  String get chatTitle;
+
+  /// No description provided for @chatIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Have a question the explanation didn\'t cover? Ask Gemini. It answers from this zone\'s numbers.'**
+  String get chatIntro;
+
+  /// No description provided for @chatSuggest1.
+  ///
+  /// In en, this message translates to:
+  /// **'Which fix should we start with?'**
+  String get chatSuggest1;
+
+  /// No description provided for @chatSuggest2.
+  ///
+  /// In en, this message translates to:
+  /// **'Can this be done under MGNREGA?'**
+  String get chatSuggest2;
+
+  /// No description provided for @chatSuggest3.
+  ///
+  /// In en, this message translates to:
+  /// **'What can farmers do this season?'**
+  String get chatSuggest3;
+
+  /// No description provided for @chatHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask a follow-up question'**
+  String get chatHint;
+
+  /// No description provided for @chatSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get chatSend;
+
+  /// No description provided for @chatThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Gemini is thinking…'**
+  String get chatThinking;
+
+  /// No description provided for @chatError.
+  ///
+  /// In en, this message translates to:
+  /// **'No answer: {error}'**
+  String chatError(String error);
+
+  /// No description provided for @chatClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear chat'**
+  String get chatClear;
+
+  /// No description provided for @mapNoKey.
+  ///
+  /// In en, this message translates to:
+  /// **'The map needs a Google Maps API key. Add MAPS_API_KEY to app/.env and run with --dart-define-from-file=.env.'**
+  String get mapNoKey;
+
+  /// No description provided for @mapKeyRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Maps rejected the API key. Check that the Maps JavaScript API is enabled and that the key\'s website restrictions include this site.'**
+  String get mapKeyRejected;
+
+  /// No description provided for @chatFootnote.
+  ///
+  /// In en, this message translates to:
+  /// **'Gemini answers from this zone\'s numbers and can make mistakes. Check with your block office before spending money.'**
+  String get chatFootnote;
 }
 
 class _AppLocalizationsDelegate

@@ -7,6 +7,7 @@ import '../../../../core/widgets/animations.dart';
 import '../../../../core/widgets/charts.dart';
 import '../../../../core/widgets/common.dart';
 import '../../../insights/presentation/widgets/explanation_card.dart';
+import '../../../insights/presentation/widgets/zone_chat_card.dart';
 import '../../../simulator/presentation/widgets/fix_toggles.dart';
 import '../../domain/catchment.dart';
 import '../../domain/zone.dart';
@@ -116,6 +117,12 @@ class ZoneDetailContent extends StatelessWidget {
         child: FixToggles(lakeId: catchment.lakeId, zone: zone),
       ),
       ExplanationCard(lakeId: catchment.lakeId, zoneId: zone.id),
+      ZoneChatCard(
+        // A fresh input per zone, so a half-typed question doesn't carry over.
+        key: ValueKey('chat-${catchment.lakeId}-${zone.id}'),
+        lakeId: catchment.lakeId,
+        zoneId: zone.id,
+      ),
     ];
 
     return Column(

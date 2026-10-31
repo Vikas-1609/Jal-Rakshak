@@ -434,4 +434,49 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get aboutBody =>
       'JalRakshak estimates soil erosion around Aravalli lakes from satellite data and suggests soil-saving works. Built for the GDG Udaipur Aravalli Build Championship.';
+
+  @override
+  String get chatTitle => 'Ask about this zone';
+
+  @override
+  String get chatIntro =>
+      'Have a question the explanation didn\'t cover? Ask Gemini. It answers from this zone\'s numbers.';
+
+  @override
+  String get chatSuggest1 => 'Which fix should we start with?';
+
+  @override
+  String get chatSuggest2 => 'Can this be done under MGNREGA?';
+
+  @override
+  String get chatSuggest3 => 'What can farmers do this season?';
+
+  @override
+  String get chatHint => 'Ask a follow-up question';
+
+  @override
+  String get chatSend => 'Send';
+
+  @override
+  String get chatThinking => 'Gemini is thinking…';
+
+  @override
+  String chatError(String error) {
+    return 'No answer: $error';
+  }
+
+  @override
+  String get chatClear => 'Clear chat';
+
+  @override
+  String get mapNoKey =>
+      'The map needs a Google Maps API key. Add MAPS_API_KEY to app/.env and run with --dart-define-from-file=.env.';
+
+  @override
+  String get mapKeyRejected =>
+      'Google Maps rejected the API key. Check that the Maps JavaScript API is enabled and that the key\'s website restrictions include this site.';
+
+  @override
+  String get chatFootnote =>
+      'Gemini answers from this zone\'s numbers and can make mistakes. Check with your block office before spending money.';
 }

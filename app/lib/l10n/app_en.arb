@@ -156,5 +156,19 @@
   "clearSaved": "Clear",
   "cleared": "Saved explanations cleared",
   "about": "About",
-  "aboutBody": "JalRakshak estimates soil erosion around Aravalli lakes from satellite data and suggests soil-saving works. Built for the GDG Udaipur Aravalli Build Championship."
+  "aboutBody": "JalRakshak estimates soil erosion around Aravalli lakes from satellite data and suggests soil-saving works. Built for the GDG Udaipur Aravalli Build Championship.",
+  "chatTitle": "Ask about this zone",
+  "chatIntro": "Have a question the explanation didn't cover? Ask Gemini. It answers from this zone's numbers.",
+  "chatSuggest1": "Which fix should we start with?",
+  "chatSuggest2": "Can this be done under MGNREGA?",
+  "chatSuggest3": "What can farmers do this season?",
+  "chatHint": "Ask a follow-up question",
+  "chatSend": "Send",
+  "chatThinking": "Gemini is thinking…",
+  "chatError": "No answer: {error}",
+  "@chatError": {"placeholders": {"error": {"type": "String"}}},
+  "chatClear": "Clear chat",
+  "mapNoKey": "The map needs a Google Maps API key. Add MAPS_API_KEY to app/.env and run with --dart-define-from-file=.env.",
+  "mapKeyRejected": "Google Maps rejected the API key. Check that the Maps JavaScript API is enabled and that the key's website restrictions include this site.",
+  "chatFootnote":"Gemini answers from this zone's numbers and can make mistakes. Check with your block office before spending money."
 }

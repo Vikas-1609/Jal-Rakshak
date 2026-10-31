@@ -1,12 +1,12 @@
 {
-    "name": "jalrakshak_app",
-    "short_name": "jalrakshak_app",
+    "name": "JalRakshak",
+    "short_name": "JalRakshak",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#0E6E7E",
+    "theme_color": "#0E6E7E",
+    "description": "See where lakes lose soil, and plan fixes zone by zone.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

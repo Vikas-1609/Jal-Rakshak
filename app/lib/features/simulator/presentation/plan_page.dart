@@ -4,6 +4,7 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/l10n/l10n.dart';
+import '../../../core/layout/breakpoints.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/haptics.dart';
@@ -83,74 +84,84 @@ class _PlanBody extends ConsumerWidget {
       plan();
     }
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-      children: [
-        const Align(alignment: Alignment.centerLeft, child: LakeSwitcher()),
-        const SizedBox(height: 12),
-        FadeSlideIn(child: PlanSummaryCard(catchment: catchment)),
-        const SizedBox(height: 20),
-        Text(l.quickPlans, style: type.titleMedium),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+    return LayoutBuilder(
+      builder: (context, c) {
+        final side = gutter(c.maxWidth, maxWidth: 1100);
+        final columns = c.maxWidth >= Breakpoints.twoColumns ? 2 : 1;
+        return ListView(
+          padding: EdgeInsets.fromLTRB(side, 4, side, 24),
           children: [
-            M3EButton.filled(
-              onPressed: () => apply(() => fixes.applyToWorst(4)),
-              icon: const Icon(Icons.local_fire_department),
-              label: Text(l.worstZones),
-            ),
-            M3EButton.tonal(
-              onPressed: () => apply(
-                () => fixes.applyEverywhere(
-                  const Fixes(trenches: true, reveg: true),
+            const Align(alignment: Alignment.centerLeft, child: LakeSwitcher()),
+            const SizedBox(height: 12),
+            FadeSlideIn(child: PlanSummaryCard(catchment: catchment)),
+            const SizedBox(height: 20),
+            Text(l.quickPlans, style: type.titleMedium),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                M3EButton.filled(
+                  onPressed: () => apply(() => fixes.applyToWorst(4)),
+                  icon: const Icon(Icons.local_fire_department),
+                  label: Text(l.worstZones),
                 ),
-              ),
-              icon: const Icon(Icons.terrain),
-              label: Text(l.allHillLand),
+                M3EButton.tonal(
+                  onPressed: () => apply(
+                    () => fixes.applyEverywhere(
+                      const Fixes(trenches: true, reveg: true),
+                    ),
+                  ),
+                  icon: const Icon(Icons.terrain),
+                  label: Text(l.allHillLand),
+                ),
+                M3EButton.tonal(
+                  onPressed: () => apply(
+                    () => fixes.applyEverywhere(const Fixes(bunds: true)),
+                  ),
+                  icon: const Icon(Icons.agriculture),
+                  label: Text(l.allFarmBunds),
+                ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutBack,
+                  child: hasFixes
+                      ? M3EButton.outlined(
+                          onPressed: () {
+                            Haptics.selection();
+                            fixes.reset();
+                          },
+                          icon: const Icon(Icons.restart_alt),
+                          label: Text(l.clearPlan),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
             ),
-            M3EButton.tonal(
-              onPressed: () =>
-                  apply(() => fixes.applyEverywhere(const Fixes(bunds: true))),
-              icon: const Icon(Icons.agriculture),
-              label: Text(l.allFarmBunds),
-            ),
-            AnimatedSize(
-              duration: const Duration(milliseconds: 250),
-              curve: Curves.easeOutBack,
-              child: hasFixes
-                  ? M3EButton.outlined(
-                      onPressed: () {
+            const SizedBox(height: 24),
+            Text(l.zonesBySoil, style: type.titleMedium),
+            const SizedBox(height: 10),
+            ResponsiveColumns(
+              columns: columns,
+              spacing: 10,
+              children: [
+                for (final (i, z) in catchment.byTonnes.indexed)
+                  FadeSlideIn(
+                    index: i,
+                    child: ZonePlanTile(
+                      catchment: catchment,
+                      zone: z,
+                      onOpen: () {
                         Haptics.selection();
-                        fixes.reset();
+                        context.push(Routes.zone(z.id));
                       },
-                      icon: const Icon(Icons.restart_alt),
-                      label: Text(l.clearPlan),
-                    )
-                  : const SizedBox.shrink(),
+                    ),
+                  ),
+              ],
             ),
           ],
-        ),
-        const SizedBox(height: 24),
-        Text(l.zonesBySoil, style: type.titleMedium),
-        const SizedBox(height: 10),
-        for (final (i, z) in catchment.byTonnes.indexed)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: FadeSlideIn(
-              index: i,
-              child: ZonePlanTile(
-                catchment: catchment,
-                zone: z,
-                onOpen: () {
-                  Haptics.selection();
-                  context.push(Routes.zone(z.id));
-                },
-              ),
-            ),
-          ),
-      ],
+        );
+      },
     );
   }
 }
