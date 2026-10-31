@@ -1,0 +1,4 @@
+# Keep secrets out of Cloud Run source uploads
+.env
+.gitignore
+*_test.go

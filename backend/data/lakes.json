@@ -1,0 +1,38 @@
+[
+  {
+    "id": "jaisamand",
+    "name": "Jaisamand Lake",
+    "district": "Udaipur",
+    "story": "Farmland and Aravalli hills drain into one of India's largest artificial lakes.",
+    "name_hi": "जयसमंद झील",
+    "district_hi": "उदयपुर",
+    "story_hi": "खेत और अरावली की पहाड़ियाँ भारत की सबसे बड़ी कृत्रिम झीलों में से एक में बहती हैं।"
+  },
+  {
+    "id": "rajsamand",
+    "name": "Rajsamand Lake",
+    "district": "Rajsamand",
+    "story": "Catchment in the marble-mining belt, where disturbed land and dumps add sediment.",
+    "name_hi": "राजसमंद झील",
+    "district_hi": "राजसमंद",
+    "story_hi": "संगमरमर खनन क्षेत्र का जलग्रहण, जहाँ उखड़ी ज़मीन और मलबे से गाद बढ़ती है।"
+  },
+  {
+    "id": "udaisagar",
+    "name": "Udai Sagar Lake",
+    "district": "Udaipur",
+    "story": "Downstream of Udaipur city: urban runoff and hill erosion meet in one lake.",
+    "name_hi": "उदय सागर झील",
+    "district_hi": "उदयपुर",
+    "story_hi": "उदयपुर शहर के नीचे की ओर: शहर का बहाव और पहाड़ियों का कटाव एक ही झील में मिलते हैं।"
+  },
+  {
+    "id": "jawai",
+    "name": "Jawai Dam",
+    "district": "Pali",
+    "story": "A large reservoir fed by Aravalli hill streams, supplying drinking and irrigation water.",
+    "name_hi": "जवाई बांध",
+    "district_hi": "पाली",
+    "story_hi": "अरावली की पहाड़ी धाराओं से भरने वाला बड़ा जलाशय, जो पीने और सिंचाई का पानी देता है।"
+  }
+]
