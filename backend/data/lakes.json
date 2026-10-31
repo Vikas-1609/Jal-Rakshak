@@ -18,15 +18,6 @@
     "story_hi": "संगमरमर खनन क्षेत्र का जलग्रहण, जहाँ उखड़ी ज़मीन और मलबे से गाद बढ़ती है।"
   },
   {
-    "id": "udaisagar",
-    "name": "Udai Sagar Lake",
-    "district": "Udaipur",
-    "story": "Downstream of Udaipur city: urban runoff and hill erosion meet in one lake.",
-    "name_hi": "उदय सागर झील",
-    "district_hi": "उदयपुर",
-    "story_hi": "उदयपुर शहर के नीचे की ओर: शहर का बहाव और पहाड़ियों का कटाव एक ही झील में मिलते हैं।"
-  },
-  {
     "id": "jawai",
     "name": "Jawai Dam",
     "district": "Pali",
@@ -34,5 +25,23 @@
     "name_hi": "जवाई बांध",
     "district_hi": "पाली",
     "story_hi": "अरावली की पहाड़ी धाराओं से भरने वाला बड़ा जलाशय, जो पीने और सिंचाई का पानी देता है।"
+  },
+  {
+    "id": "badi",
+    "name": "Badi Lake",
+    "district": "Udaipur",
+    "story": "A village tank fed by a small ring of Aravalli hills, where every eroding slope counts.",
+    "name_hi": "बड़ी झील",
+    "district_hi": "उदयपुर",
+    "story_hi": "अरावली की छोटी पहाड़ियों से घिरा गाँव का तालाब, जहाँ हर कटती ढलान मायने रखती है।"
+  },
+  {
+    "id": "siliserh",
+    "name": "Siliserh Lake",
+    "district": "Alwar",
+    "story": "A rural Ramsar wetland near Sariska, filled by short hill streams off the northern Aravallis.",
+    "name_hi": "सिलीसेढ़ झील",
+    "district_hi": "अलवर",
+    "story_hi": "सरिस्का के पास ग्रामीण रामसर आर्द्रभूमि, जो उत्तरी अरावली की छोटी पहाड़ी धाराओं से भरती है।"
   }
 ]
