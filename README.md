@@ -8,7 +8,7 @@ JalRakshak answers both questions from satellite data. It splits each lake's cat
 
 Built for the GDG Udaipur Aravalli Build Championship.
 
-**Live:** web app at https://jal-rakshak-75ce7.web.app · API at `https://jalrakshak-api-870269078343.asia-south1.run.app/api/lakes`
+**Live:** web app at https://jal-rakshak-75ce7.web.app
 
 ## Features
 
