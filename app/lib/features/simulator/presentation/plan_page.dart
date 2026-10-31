@@ -13,6 +13,7 @@ import '../../../core/widgets/common.dart';
 import '../../catchment/application/catchment_providers.dart';
 import '../../catchment/domain/catchment.dart';
 import '../../lakes/presentation/widgets/lake_switcher.dart';
+import '../../report/application/report_export.dart';
 import '../../settings/application/settings_providers.dart';
 import '../application/simulator_providers.dart';
 import '../domain/fixes.dart';
@@ -39,15 +40,46 @@ class _PlanPageState extends ConsumerState<PlanPage> {
     }
   }
 
+  bool _exporting = false;
+
+  Future<void> _export(Catchment catchment) async {
+    final l = context.l10n;
+    Haptics.selection();
+    setState(() => _exporting = true);
+    M3ESnackbar.show(context, message: l.exportingReport);
+    try {
+      await exportPlanReport(ref, l, catchment);
+    } catch (e) {
+      if (mounted) M3ESnackbar.show(context, message: l.exportFailed('$e'));
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
+    final catchment = ref.watch(currentCatchmentProvider).value;
     return Scaffold(
       appBar: M3EAppBar.top(
         variant: M3EAppBarVariant.mediumFlexible,
         titleText: l.planTitle,
         subtitleText: l.planSubtitle,
         actions: [
+          M3EIconButton(
+            variant: M3EIconButtonVariant.tonal,
+            icon: _exporting
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  )
+                : const Icon(Icons.picture_as_pdf_outlined),
+            tooltip: l.exportReport,
+            onPressed: catchment == null || _exporting
+                ? null
+                : () => _export(catchment),
+          ),
+          const SizedBox(width: 4),
           M3EIconButton(
             variant: M3EIconButtonVariant.tonal,
             icon: const Icon(Icons.help_outline),
@@ -68,13 +100,41 @@ class _PlanPageState extends ConsumerState<PlanPage> {
   }
 }
 
-class _PlanBody extends ConsumerWidget {
+class _PlanBody extends ConsumerStatefulWidget {
   const _PlanBody({required this.catchment});
 
   final Catchment catchment;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PlanBody> createState() => _PlanBodyState();
+}
+
+class _PlanBodyState extends ConsumerState<_PlanBody> {
+  final _cardKey = GlobalKey();
+  final _showStrip = ValueNotifier(false);
+
+  @override
+  void dispose() {
+    _showStrip.dispose();
+    super.dispose();
+  }
+
+  /// Shows the pinned strip once the summary card's progress bar has
+  /// scrolled up behind the app bar.
+  bool _onScroll(ScrollNotification n) {
+    final card = _cardKey.currentContext?.findRenderObject() as RenderBox?;
+    final body = context.findRenderObject() as RenderBox?;
+    if (card != null && body != null && card.attached) {
+      final bottom =
+          card.localToGlobal(Offset.zero, ancestor: body).dy + card.size.height;
+      _showStrip.value = bottom < 56;
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final catchment = widget.catchment;
     final l = context.l10n;
     final type = emphasized(context);
     final fixes = ref.read(fixesProvider(catchment.lakeId).notifier);
@@ -88,12 +148,14 @@ class _PlanBody extends ConsumerWidget {
       builder: (context, c) {
         final side = gutter(c.maxWidth, maxWidth: 1100);
         final columns = c.maxWidth >= Breakpoints.twoColumns ? 2 : 1;
-        return ListView(
+        final list = ListView(
           padding: EdgeInsets.fromLTRB(side, 4, side, 24),
           children: [
             const Align(alignment: Alignment.centerLeft, child: LakeSwitcher()),
             const SizedBox(height: 12),
-            FadeSlideIn(child: PlanSummaryCard(catchment: catchment)),
+            FadeSlideIn(
+              child: PlanSummaryCard(key: _cardKey, catchment: catchment),
+            ),
             const SizedBox(height: 20),
             Text(l.quickPlans, style: type.titleMedium),
             const SizedBox(height: 10),
@@ -158,6 +220,39 @@ class _PlanBody extends ConsumerWidget {
                     ),
                   ),
               ],
+            ),
+          ],
+        );
+        return Stack(
+          children: [
+            NotificationListener<ScrollNotification>(
+              onNotification: _onScroll,
+              child: list,
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: ValueListenableBuilder(
+                valueListenable: _showStrip,
+                builder: (context, show, child) => IgnorePointer(
+                  ignoring: !show,
+                  child: AnimatedSlide(
+                    offset: show ? Offset.zero : const Offset(0, -1),
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOutCubic,
+                    child: AnimatedOpacity(
+                      opacity: show ? 1 : 0,
+                      duration: const Duration(milliseconds: 180),
+                      child: child,
+                    ),
+                  ),
+                ),
+                child: PlanProgressStrip(
+                  catchment: catchment,
+                  padding: EdgeInsets.fromLTRB(side, 10, side, 12),
+                ),
+              ),
             ),
           ],
         );

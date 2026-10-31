@@ -479,4 +479,96 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get chatFootnote =>
       'Gemini answers from this zone\'s numbers and can make mistakes. Check with your block office before spending money.';
+
+  @override
+  String get videosTitle => 'Learn how: video guides';
+
+  @override
+  String get exportReport => 'Export PDF report';
+
+  @override
+  String get exportingReport => 'Preparing report…';
+
+  @override
+  String exportFailed(String error) {
+    return 'Couldn\'t create the report: $error';
+  }
+
+  @override
+  String reportTitle(String lake) {
+    return 'Soil restoration plan · $lake';
+  }
+
+  @override
+  String reportGenerated(String date) {
+    return 'Generated $date by JalRakshak';
+  }
+
+  @override
+  String get reportBaseline => 'Soil lost per year today';
+
+  @override
+  String get reportWithPlan => 'With this plan';
+
+  @override
+  String get reportSaved => 'Kept in place';
+
+  @override
+  String reportZonesTreated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count zones treated',
+      one: '1 zone treated',
+      zero: 'No zones treated yet',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reportMapTitle => 'Catchment zones with the plan applied';
+
+  @override
+  String get reportMapCaption =>
+      'Colour shows soil loss per hectare with the plan applied: green is low, red is severe.';
+
+  @override
+  String get reportZoneTable => 'Zone by zone';
+
+  @override
+  String get colZone => 'Zone';
+
+  @override
+  String get colType => 'Type';
+
+  @override
+  String get colRate => 't/ha/yr';
+
+  @override
+  String get colPerYear => 'Lost / yr';
+
+  @override
+  String get colFixes => 'Fixes';
+
+  @override
+  String get colSaved => 'Saved / yr';
+
+  @override
+  String get noFixes => 'None';
+
+  @override
+  String get reportInsights => 'Why the worst zones erode';
+
+  @override
+  String get reportWhy => 'Why';
+
+  @override
+  String get reportActions => 'What to do';
+
+  @override
+  String get reportTip => 'Tip for farmers';
+
+  @override
+  String get reportFootnote =>
+      'Estimates from a RUSLE soil-erosion model on satellite data, for comparing places, not measurements. Explanations written by Gemini and can contain mistakes.';
 }

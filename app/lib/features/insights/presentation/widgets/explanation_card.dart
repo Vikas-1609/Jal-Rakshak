@@ -7,8 +7,10 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/haptics.dart';
 import '../../../../core/widgets/animations.dart';
 import '../../../../core/widgets/common.dart';
+import '../../../catchment/application/catchment_providers.dart';
 import '../../application/insights_providers.dart';
 import '../../domain/explanation.dart';
+import 'tutorial_videos_strip.dart';
 
 /// Gemini's "why, and what to do" for one zone, in the app's language.
 class ExplanationCard extends ConsumerWidget {
@@ -25,6 +27,7 @@ class ExplanationCard extends ConsumerWidget {
     final l = context.l10n;
     final zone = (lakeId: lakeId, zoneId: zoneId);
     final explanation = ref.watch(explanationProvider(zone));
+    final zoneData = ref.watch(catchmentProvider(lakeId)).value?.byId[zoneId];
 
     return SectionCard(
       title: l.whyTitle,
@@ -67,6 +70,11 @@ class ExplanationCard extends ConsumerWidget {
               _ => const _LoadingSkeleton(key: ValueKey('loading')),
             },
           ),
+          // Videos once Gemini has answered, so they follow its reasons.
+          if (explanation.hasValue && zoneData != null) ...[
+            const SizedBox(height: 16),
+            FadeSlideIn(child: TutorialVideosStrip(zone: zoneData)),
+          ],
           const SizedBox(height: 10),
           Text(l.geminiFootnote, style: Theme.of(context).textTheme.labelSmall),
         ],

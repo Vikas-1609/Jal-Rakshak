@@ -480,4 +480,96 @@ class AppLocalizationsHi extends AppLocalizations {
   @override
   String get chatFootnote =>
       'Gemini इस क्षेत्र के आँकड़ों से जवाब देता है और गलती कर सकता है। पैसा लगाने से पहले ब्लॉक कार्यालय से पूछ लें।';
+
+  @override
+  String get videosTitle => 'वीडियो से सीखें';
+
+  @override
+  String get exportReport => 'PDF रिपोर्ट बनाएँ';
+
+  @override
+  String get exportingReport => 'रिपोर्ट तैयार हो रही है…';
+
+  @override
+  String exportFailed(String error) {
+    return 'रिपोर्ट नहीं बन सकी: $error';
+  }
+
+  @override
+  String reportTitle(String lake) {
+    return 'मिट्टी बचाव योजना · $lake';
+  }
+
+  @override
+  String reportGenerated(String date) {
+    return 'JalRakshak द्वारा $date को बनाई गई';
+  }
+
+  @override
+  String get reportBaseline => 'आज हर साल बहने वाली मिट्टी';
+
+  @override
+  String get reportWithPlan => 'इस योजना के साथ';
+
+  @override
+  String get reportSaved => 'बचाई गई मिट्टी';
+
+  @override
+  String reportZonesTreated(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count क्षेत्रों में काम',
+      one: '1 क्षेत्र में काम',
+      zero: 'अभी कोई क्षेत्र नहीं चुना',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get reportMapTitle => 'योजना लागू होने पर जलग्रहण क्षेत्र';
+
+  @override
+  String get reportMapCaption =>
+      'रंग योजना के बाद प्रति हेक्टेयर मिट्टी का नुकसान दिखाता है: हरा कम, लाल बहुत ज़्यादा।';
+
+  @override
+  String get reportZoneTable => 'क्षेत्रवार विवरण';
+
+  @override
+  String get colZone => 'क्षेत्र';
+
+  @override
+  String get colType => 'प्रकार';
+
+  @override
+  String get colRate => 'टन/हे/वर्ष';
+
+  @override
+  String get colPerYear => 'नुकसान / वर्ष';
+
+  @override
+  String get colFixes => 'उपाय';
+
+  @override
+  String get colSaved => 'बचत / वर्ष';
+
+  @override
+  String get noFixes => 'कोई नहीं';
+
+  @override
+  String get reportInsights => 'सबसे ज़्यादा कटाव वाले क्षेत्र क्यों';
+
+  @override
+  String get reportWhy => 'क्यों';
+
+  @override
+  String get reportActions => 'क्या करें';
+
+  @override
+  String get reportTip => 'किसानों के लिए सुझाव';
+
+  @override
+  String get reportFootnote =>
+      'उपग्रह आँकड़ों पर RUSLE मिट्टी-कटाव मॉडल के अनुमान, जगहों की तुलना के लिए, माप नहीं। विवरण Gemini ने लिखे हैं और इनमें गलती हो सकती है।';
 }

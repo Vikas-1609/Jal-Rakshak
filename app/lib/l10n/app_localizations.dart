@@ -883,6 +883,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Gemini answers from this zone\'s numbers and can make mistakes. Check with your block office before spending money.'**
   String get chatFootnote;
+
+  /// No description provided for @videosTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Learn how: video guides'**
+  String get videosTitle;
+
+  /// No description provided for @exportReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export PDF report'**
+  String get exportReport;
+
+  /// No description provided for @exportingReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing report…'**
+  String get exportingReport;
+
+  /// No description provided for @exportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t create the report: {error}'**
+  String exportFailed(String error);
+
+  /// No description provided for @reportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Soil restoration plan · {lake}'**
+  String reportTitle(String lake);
+
+  /// No description provided for @reportGenerated.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated {date} by JalRakshak'**
+  String reportGenerated(String date);
+
+  /// No description provided for @reportBaseline.
+  ///
+  /// In en, this message translates to:
+  /// **'Soil lost per year today'**
+  String get reportBaseline;
+
+  /// No description provided for @reportWithPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'With this plan'**
+  String get reportWithPlan;
+
+  /// No description provided for @reportSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept in place'**
+  String get reportSaved;
+
+  /// No description provided for @reportZonesTreated.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No zones treated yet} =1{1 zone treated} other{{count} zones treated}}'**
+  String reportZonesTreated(int count);
+
+  /// No description provided for @reportMapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Catchment zones with the plan applied'**
+  String get reportMapTitle;
+
+  /// No description provided for @reportMapCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'Colour shows soil loss per hectare with the plan applied: green is low, red is severe.'**
+  String get reportMapCaption;
+
+  /// No description provided for @reportZoneTable.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone by zone'**
+  String get reportZoneTable;
+
+  /// No description provided for @colZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Zone'**
+  String get colZone;
+
+  /// No description provided for @colType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get colType;
+
+  /// No description provided for @colRate.
+  ///
+  /// In en, this message translates to:
+  /// **'t/ha/yr'**
+  String get colRate;
+
+  /// No description provided for @colPerYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Lost / yr'**
+  String get colPerYear;
+
+  /// No description provided for @colFixes.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixes'**
+  String get colFixes;
+
+  /// No description provided for @colSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved / yr'**
+  String get colSaved;
+
+  /// No description provided for @noFixes.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get noFixes;
+
+  /// No description provided for @reportInsights.
+  ///
+  /// In en, this message translates to:
+  /// **'Why the worst zones erode'**
+  String get reportInsights;
+
+  /// No description provided for @reportWhy.
+  ///
+  /// In en, this message translates to:
+  /// **'Why'**
+  String get reportWhy;
+
+  /// No description provided for @reportActions.
+  ///
+  /// In en, this message translates to:
+  /// **'What to do'**
+  String get reportActions;
+
+  /// No description provided for @reportTip.
+  ///
+  /// In en, this message translates to:
+  /// **'Tip for farmers'**
+  String get reportTip;
+
+  /// No description provided for @reportFootnote.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimates from a RUSLE soil-erosion model on satellite data, for comparing places, not measurements. Explanations written by Gemini and can contain mistakes.'**
+  String get reportFootnote;
 }
 
 class _AppLocalizationsDelegate

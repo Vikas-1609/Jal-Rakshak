@@ -50,15 +50,9 @@ class PlanSummaryCard extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          TweenAnimationBuilder<double>(
-            tween: Tween(end: savedFrac),
-            duration: const Duration(milliseconds: 700),
-            curve: Curves.easeOutCubic,
-            builder: (_, v, _) => M3EProgressIndicator.linearWavy(
-              value: v,
-              color: scheme.primary,
-              trackColor: scheme.surface.withValues(alpha: 0.7),
-            ),
+          _SavedProgress(
+            value: savedFrac,
+            trackColor: scheme.surface.withValues(alpha: 0.7),
           ),
           const SizedBox(height: 10),
           AnimatedSwitcher(
@@ -76,6 +70,77 @@ class PlanSummaryCard extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Compact strip pinned under the app bar while the summary card is
+/// scrolled out of view: the same progress bar plus soil left and % saved.
+class PlanProgressStrip extends ConsumerWidget {
+  const PlanProgressStrip({
+    super.key,
+    required this.catchment,
+    required this.padding,
+  });
+
+  final Catchment catchment;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l = context.l10n;
+    final scheme = Theme.of(context).colorScheme;
+    final type = emphasized(context);
+    final sim = ref.watch(simResultProvider(catchment.lakeId)).value;
+    final baseline = catchment.summary.totalT;
+    final now = sim?.scenarioT ?? baseline;
+    final savedFrac = sim == null ? 0.0 : sim.savedT / baseline;
+
+    return Material(
+      color: scheme.surfaceContainer,
+      elevation: 2,
+      shadowColor: scheme.shadow.withValues(alpha: 0.3),
+      child: Padding(
+        padding: padding,
+        child: Row(
+          children: [
+            Text(fmtTonnes(l, now), style: type.titleSmall),
+            const SizedBox(width: 14),
+            Expanded(
+              child: _SavedProgress(
+                value: savedFrac,
+                trackColor: scheme.surfaceContainerHighest,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Text(
+              '${(sim?.savedPct ?? 0).toStringAsFixed(0)}%',
+              style: type.titleSmall.copyWith(color: scheme.primary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SavedProgress extends StatelessWidget {
+  const _SavedProgress({required this.value, required this.trackColor});
+
+  final double value;
+  final Color trackColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(end: value),
+      duration: const Duration(milliseconds: 700),
+      curve: Curves.easeOutCubic,
+      builder: (_, v, _) => M3EProgressIndicator.linearWavy(
+        value: v,
+        color: Theme.of(context).colorScheme.primary,
+        trackColor: trackColor,
       ),
     );
   }

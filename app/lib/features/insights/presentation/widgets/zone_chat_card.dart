@@ -1,3 +1,4 @@
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -265,13 +266,68 @@ class _Bubble extends StatelessWidget {
               ),
             ),
             // Selectable, so an answer can be copied into a message or report.
-            child: SelectableText(
-              message.text,
-              style: TextStyle(
-                color: mine ? scheme.onPrimaryContainer : scheme.onSurface,
-              ),
-            ),
+            child: mine
+                ? SelectableText(
+                    message.text,
+                    style: TextStyle(color: scheme.onPrimaryContainer),
+                  )
+                : _AnswerMarkdown(text: message.text),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Gemini's answer as Markdown: headings, bullet lists and bold, styled to
+/// match the app. Also used while the answer streams in, when the last
+/// line may be cut mid-way; Markdown renders that as plain text until done.
+class _AnswerMarkdown extends StatelessWidget {
+  const _AnswerMarkdown({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final body = theme.textTheme.bodyMedium!.copyWith(
+      color: scheme.onSurface,
+      height: 1.45,
+    );
+    return MarkdownBody(
+      data: text,
+      selectable: true,
+      styleSheet: MarkdownStyleSheet(
+        p: body,
+        strong: const TextStyle(fontWeight: FontWeight.w700),
+        em: const TextStyle(fontStyle: FontStyle.italic),
+        h1: theme.textTheme.titleMedium!.copyWith(
+          color: scheme.primary,
+          fontWeight: FontWeight.w700,
+        ),
+        h2: theme.textTheme.titleMedium!.copyWith(
+          color: scheme.primary,
+          fontWeight: FontWeight.w700,
+        ),
+        h3: theme.textTheme.titleSmall!.copyWith(
+          color: scheme.primary,
+          fontWeight: FontWeight.w700,
+        ),
+        h1Padding: const EdgeInsets.only(top: 6),
+        h2Padding: const EdgeInsets.only(top: 6),
+        h3Padding: const EdgeInsets.only(top: 6),
+        listBullet: body.copyWith(color: scheme.primary),
+        listIndent: 20,
+        blockSpacing: 8,
+        blockquote: body.copyWith(color: scheme.onSurfaceVariant),
+        blockquoteDecoration: BoxDecoration(
+          border: Border(left: BorderSide(color: scheme.outline, width: 3)),
+        ),
+        blockquotePadding: const EdgeInsets.only(left: 10),
+        code: body.copyWith(
+          fontFamily: 'monospace',
+          backgroundColor: scheme.surfaceContainerHighest,
         ),
       ),
     );
